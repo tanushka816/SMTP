@@ -1,0 +1,127 @@
+import os
+import sys
+import configparser
+import base64
+import socket
+import ssl
+
+
+PORT = 465
+SERVER = 'smtp.yandex.ru'
+
+RECIPIENT = ['tanushka.vasilieva816@yandex.ru']
+SENDER = 'testIMAPChe@yandex.ru'
+SEND_PSSW = 'fortest'
+
+MIMEs = {'jpeg': 'image/jpeg',
+         'png': 'image/png',
+         'txt': 'text/plain',
+         # 'mp4': 'video/mp4',
+         # 'doc': 'application/msword',
+         'pdf': 'application/pdf'}
+
+DIRECTORY = "data"
+CONFIG_FILE = "config.ini"
+
+
+def start(server=SERVER):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((server, PORT))
+    ssl_sock = ssl.wrap_socket(sock)
+    data = ssl_sock.recv(1024)
+    print(data)
+    end_letter = wrap_up_letter()
+    for i in end_letter:
+        i = i + '\r\n'
+        # print(i)
+        ssl_sock.send(i.encode())
+        answer = ssl_sock.recv(1024)
+        print(answer)
+    ssl_sock.close()
+
+
+def wrap_up_letter(recp=RECIPIENT, sender=SENDER, send_pssw = SEND_PSSW):
+    text_f, recp, subj, attachm = get_from_config()
+    text_mess = get_text(text_f)
+    # print(build_letter(subj, text_mess, attachm))
+    packet = build_letter(subj, text_mess, attachm)
+    result = ['EHLO '+sender.split('@')[0], 'AUTH LOGIN',
+              base64.b64encode(sender.encode()).decode(),
+              base64.b64encode(send_pssw.encode()).decode(),
+              'MAIL FROM: ' + sender,
+              *['RCPT TO: ' + r for r in recp],
+              'DATA',
+              packet,
+              'QUIT']
+    return result
+
+
+def get_from_config(dirct=DIRECTORY, conf_file=CONFIG_FILE):
+    """
+    Create, read, update, delete config
+    """
+    path = os.path.join(dirct, conf_file)
+    if not os.path.exists(path):
+        print("Please, create config.ini with ini_maker.py in data!")
+        sys.exit(1)
+
+    config = configparser.ConfigParser()
+    config.read(path)
+
+    recipients = []
+    addr_list = config.items("TO")
+    for _, recp in addr_list:
+        recipients.append(recp)
+
+    subj = config.get("SUBJECT", "subject")
+    text = config.get("TEXT", "text")
+
+    attachms = []
+    attm_list = config.items("ATTACHMENTS")
+    for _, atc in attm_list:
+        attachms.append(atc)
+
+    return text, recipients, subj, attachms
+
+
+def build_letter(subj, text, attachm, recp=RECIPIENT, sender=SENDER):
+    result = f"From: {sender}\n"
+    for recp in recp:
+        result += f"To: {recp}\n"
+    result += f"Subject: =?UTF-8?B?{base64.b64encode(subj.encode()).decode()}?=\n"
+    bnd = "boundaryText"
+    if attachm:
+        result += f"Content-Type: multipart/mixed; boundary={bnd};\n\n\n"
+        if text:
+            result += f"--{bnd}\nContent-Type: text/plain; charset=utf-8;\n\n{text}"
+        for atc in attachm:
+            name_b64 = f'"=?UTF-8?B?{base64.b64encode(atc.encode()).decode()}?="'
+            result += f"--{bnd}\nContent-Disposition:attachment; filename={name_b64}\n"
+            result += f"Content-Transfer-Encoding:base64\nContent-Type:{MIMEs[atc.split('.')[-1]]}; "
+            result += f"name={name_b64}\n\n"
+            # result += f"--{bnd}\n Content-Type:{MIMEs[atc.split('.')[-1]]}; name={name_b64}\n "
+            # result += f"Content-Transfer-Encoding:base64\n Content-Disposition:attachment; filename={name_b64}\n\n"
+            result += f"{attachment_to_base64(atc)}\n"
+            # print(attachment_to_base64(atc))
+        result += f"--{bnd}--"
+    else:
+        result += f"Content-Type: text/plain; charset=utf-8;\n\n {text}"
+
+    # print(result + "\n.")
+    return result + "\n."
+
+
+def attachment_to_base64(atc):
+    with open(f"data\\{atc}", mode='rb') as f:
+        return base64.b64encode(f.read()).decode()
+
+
+def get_text(file):
+    result = ""
+    with open("data\\" + file, encoding="utf-8", mode='r') as f:
+        result += f.read()
+    return result
+
+
+if __name__ == '__main__':
+    start()

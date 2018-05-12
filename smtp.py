@@ -41,7 +41,10 @@ def start(server=SERVER):
 
 def wrap_up_letter(recp=RECIPIENT, sender=SENDER, send_pssw = SEND_PSSW):
     text_f, recp, subj, attachm = get_from_config()
-    text_mess = get_text(text_f)
+    text_mess = ""
+    for text_in in text_f:
+        text_mess += get_text(text_in)
+
     # print(build_letter(subj, text_mess, attachm))
     packet = build_letter(subj, text_mess, attachm)
     recp_to = ""
@@ -78,7 +81,11 @@ def get_from_config(dirct=DIRECTORY, conf_file=CONFIG_FILE):
         recipients.append(recp)
 
     subj = config.get("SUBJECT", "subject")
-    text = config.get("TEXT", "text")
+    # text = config.get("TEXT", "text")
+    text = []
+    text_list = config.items(("TEXT"))
+    for _, t in text_list:
+        text.append((t))
 
     attachms = []
     attm_list = config.items("ATTACHMENTS")
@@ -94,9 +101,9 @@ def build_letter(subj, text, attachm, recp=RECIPIENT, sender=SENDER):
         result += f"To: {recp}\n"
     result += f"Subject: =?UTF-8?B?{base64.b64encode(subj.encode()).decode()}?=\n"
     bnd = str(hash("boundaryText"))
-    # print(bnd)
-    if text and '\n.\n' in text:
-        text.replace('\n.\n', '\n..\n')
+    # # print(bnd)
+    # if text and '\n.\n' in text:
+    #     text.replace('\n.\n', '\n..\n')
 
     if attachm:
         result += f"Content-Type: multipart/mixed; boundary={bnd};\n\n"

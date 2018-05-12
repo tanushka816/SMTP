@@ -8,6 +8,8 @@ import ssl
 
 PORT = 465
 SERVER = 'smtp.yandex.ru'
+bnd = "boundaryText"
+
 
 RECIPIENT = ['tanushka.vasilieva816@yandex.ru']
 SENDER = 'testIMAPChe@yandex.ru'
@@ -96,25 +98,28 @@ def get_from_config(dirct=DIRECTORY, conf_file=CONFIG_FILE):
 
 
 def build_letter(subj, text, attachm, recp=RECIPIENT, sender=SENDER):
+    global bnd
     result = f"From: {sender}\n"
     for recp in recp:
         result += f"To: {recp}\n"
     result += f"Subject: =?UTF-8?B?{base64.b64encode(subj.encode()).decode()}?=\n"
-    bnd = str(hash("boundaryText"))
+    # bnd = str(hash("boundaryText"))  # реплэйс
     # # print(bnd)
-    # if text and '\n.\n' in text:
-    #     text.replace('\n.\n', '\n..\n')
+    # bnd = "boundaryText"
+    if text and '\n.\n' in text:
+        text = text.replace('\n.\n', '\n..\n')
+        # text = text.replace("boundaryText", "boundaryText")
 
     if attachm:
         result += f"Content-Type: multipart/mixed; boundary={bnd};\n\n"
         if text:
             result += f"--{bnd}\nContent-Type: text/plain; charset=utf-8;\n"
-            result += f"Content-Transfer-Encoding: base64\n\n"
-            result += base64.b64encode(text.encode()).decode() + '\n.'
+            # result += f"Content-Transfer-Encoding: base64\n\n"
+            result += text + '\n.'
         for atc in attachm:
             name_b64 = f'"=?UTF-8?B?{base64.b64encode(atc.encode()).decode()}?="'
             result += f"--{bnd}\nContent-Type:{MIMEs[atc.split('.')[-1]]};\nContent-Transfer-Encoding:base64\n"
-            result += f"Content-Disposition:attachment; filename={name_b64}\n\n"
+            result += f"Content-Disposition:attachment; filename={name_b64}\n\n"  # or relative
             # result += f"--{bnd}\nContent-Disposition:attachment; filename={name_b64}\n"
             # result += f"Content-Transfer-Encoding:base64\nContent-Type:{MIMEs[atc.split('.')[-1]]}; "
             # result += f"name={name_b64}\n\n"
@@ -138,9 +143,16 @@ def attachment_to_base64(atc):
 
 
 def get_text(file):
+    global bnd
+    bnd_count = 0
     result = ""
     with open("data\\" + file, encoding="utf-8", mode='r') as f:
-        result += f.read()
+        for line in f:
+            if bnd in line:
+                bnd += str(bnd_count)
+                bnd_count += 1
+            result += line
+        # if "boundaryText" in
     return result
 
 
